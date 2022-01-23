@@ -85,6 +85,8 @@ def train(model, train_loader, valid_loader, loss_optim, optimizer, epochs, devi
 
         print("START VALIDATING")
         #TODO: Set hook to eval mode
+        if hook:
+            hook.set_mode(modes.TRAIN)
         model.eval()
         val_loss = 0
         with torch.no_grad():
