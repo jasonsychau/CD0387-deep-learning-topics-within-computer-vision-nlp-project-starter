@@ -44,7 +44,8 @@ def test(model, test_loader, criterion, device):
 
     total_loss = running_loss / len(test_loader.dataset)
     total_acc = running_corrects/ len(test_loader.dataset)
-    print(f"Testing Accuracy: {100*total_acc}, Testing Loss: {total_loss}")
+    print(f"Testing Accuracy: {100*total_acc}")
+    print(f"Testing Loss: {total_loss}")
     pass
 
 def train(model, train_loader, valid_loader, loss_optim, optimizer, epochs, device):
@@ -93,8 +94,8 @@ def train(model, train_loader, valid_loader, loss_optim, optimizer, epochs, devi
                 loss = loss_optim(outputs, targets)
                 val_loss += loss.item()
         print(
-            "Epoch %d: train loss %.3f, val loss %.3f\nHyperparameters: lr %.3f, batch size %d"
-            % (i, train_loss, val_loss, optimizer.lr, train_loader.batch_size)
+            "Epoch %d: train loss %.3f, val loss %.3f"
+            % (i, train_loss, val_loss)
         )
     return model
 
