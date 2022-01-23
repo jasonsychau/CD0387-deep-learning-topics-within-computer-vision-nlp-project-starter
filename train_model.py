@@ -21,7 +21,7 @@ import smdebug.pytorch as smd
 
 #TODO: Import dependencies for Debugging andd Profiling
 
-def test(model, test_loader, criterion, hook):
+def test(model, test_loader, criterion, device):
     '''
     TODO: Complete this function that can take a model and a 
           testing data loader and will get the test accuray/loss of the model
@@ -30,9 +30,8 @@ def test(model, test_loader, criterion, hook):
     model.eval()
     running_loss=0
     running_corrects=0
-    running_samples = 0
-    hook.register_loss(criterion)
-    hook.set_mode(modes.EVAL)
+#     hook.register_loss(criterion)
+#     hook.set_mode(modes.EVAL)
 
     for inputs, labels in test_loader:
         inputs=inputs.to(device)
@@ -42,34 +41,34 @@ def test(model, test_loader, criterion, hook):
         _, preds = torch.max(outputs, 1)
         running_loss += loss.item() * inputs.size(0)
         running_corrects += torch.sum(preds == labels.data).item()
-        running_samples+=len(inputs)
-        #NOTE: sample less data since time is running low
-#         if running_samples>(0.1*len(test_loader.dataset)):
-#             break
 
     total_loss = running_loss / len(test_loader.dataset)
     total_acc = running_corrects/ len(test_loader.dataset)
+    print(f"Testing Accuracy: {100*total_acc}, Testing Loss: {total_loss}")
     pass
 
-def train(model, train_loader, loss_optim, optimizer, epochs, device, hook):
+def train(model, train_loader, valid_loader, loss_optim, optimizer, epochs, device):
     '''
     TODO: Complete this function that can take a model and
           data loaders for training and will get train the model
           Remember to include any debugging/profiling hooks that you might need
     '''
-    hook.register_loss(loss_optim)
     model.train()
-    hook.set_mode(modes.TRAIN)
     #TODO: Set Hook to track the loss
+    hook = get_hook(create_if_not_exists=True)
+    if hook:
+        hook.register_loss(loss_optim)    
     
     for i in range(epochs):
         print("START TRAINING")
         # TODO: Set hook to train mode
-#         start = time.time()
+        if hook:
+            hook.set_mode(modes.TRAIN)
+        model.train()
         train_loss = 0
-#         running_samples = 0
+        running_samples = 0
         for image_no, (inputs, targets) in enumerate(train_loader):
-            if (image_no % 100):
+            if (image_no % 100 == 0):
                 print('fitting {}'.format(image_no))
             inputs, targets = inputs.to(device), targets.to(device)
             optimizer.zero_grad()
@@ -78,21 +77,27 @@ def train(model, train_loader, loss_optim, optimizer, epochs, device, hook):
             loss.backward()
             optimizer.step()
             train_loss += loss.item()
-#             running_samples+=len(inputs)
+            running_samples+=len(inputs)
             #NOTE: train on smaller sample since time is running low
-#             if running_samples>(0.1*len(train_loader.dataset)):
+#             if running_samples>(0.2*len(train_loader.dataset)):
 #                 break
 
-#         epoch_time = time.time() - start
+        print("START VALIDATING")
+        #TODO: Set hook to eval mode
+        model.eval()
+        val_loss = 0
+        with torch.no_grad():
+            for _, (inputs, targets) in enumerate(valid_loader):
+                inputs, targets = inputs.to(device), targets.to(device)
+                outputs = model(inputs)
+                loss = loss_optim(outputs, targets)
+                val_loss += loss.item()
         print(
-            "Epoch %d: train loss %.3f"
-            % (i, train_loss)
+            "Epoch %d: train loss %.3f, val loss %.3f\nHyperparameters: lr %.3f, batch size %d"
+            % (i, train_loss, val_loss, optimizer.lr, train_loader.batch_size)
         )
     return model
 
-
-
-    
 def net():
     '''
     TODO: Complete this function that initializes your model
@@ -146,8 +151,9 @@ def main(args):
     model=net()
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model=model.to(device)
-    hook = smd.Hook.create_from_json_file()
-    hook.register_hook(model)
+#     hook = get_hook(create_if_not_exists=True)
+#     if hook:
+#         hook.register_hook(model)
     
     '''
     TODO: Create your loss and optimizer
@@ -160,17 +166,17 @@ def main(args):
     Remember that you will need to set up a way to get training data from S3
     '''
     (train_loader, test_loader) = create_data_loaders(args.data_dir, args.batch_size, args.test_batch_size)
-    model=train(model, train_loader, loss_criterion, optimizer, args.epochs, device, hook)
+    model=train(model, train_loader, test_loader, loss_criterion, optimizer, args.epochs, device)
     
     '''
     TODO: Test the model to see its accuracy
     '''
-    test(model, test_loader, loss_criterion, hook)
+    test(model, test_loader, loss_criterion, device)
     
     '''
     TODO: Save the trained model
     '''
-    logger.info("Saving the model.")
+    print("Saving the model.")
     path = os.path.join(args.model_dir, "model.pth")
     torch.save(model.cpu().state_dict(), path)
 
@@ -183,16 +189,16 @@ if __name__=='__main__':
     parser.add_argument(
         "--batch-size",
         type=int,
-        default=1000,
+        default=100,
         metavar="N",
-        help="input batch size for training (default: 64)",
+        help="input batch size for training (default: 100)",
     )
     parser.add_argument(
         "--test-batch-size",
         type=int,
-        default=1000,
+        default=100,
         metavar="N",
-        help="input batch size for testing (default: 1000)",
+        help="input batch size for testing (default: 100)",
     )
     parser.add_argument(
         "--epochs",
