@@ -23,9 +23,14 @@ Remember that your README should:
 - Tune at least two hyperparameters
 - Retrieve the best best hyperparameters from all your training jobs
 
-Training jobs screencapture is trainin_jobs.png. The logs are in batch-size_10_lr_0_09386252244689186.png and batch-size_10_lr_0_09727184909755177.png. 
+Training jobs screencapture is training_jobs.png. The logs are in batch-size_10_lr_0_09386252244689186.png and batch-size_10_lr_0_09727184909755177.png. 
+![Training jobs](training_jobs.png)
+![Training 1 log](batch-size_10_lr_0_09386252244689186.png)
+![Training 2 log](batch-size_10_lr_0_09727184909755177.png)
 
 I chose the resnet18 model since I have experience with it from exercises (and it is pretrained for shorter training time). I used parameter ranges lr 0.9 to 1.0 and batch size 10 and 100. After training, I found that loss increased after two epoches. I guess that the optimizer went to far with the gradient and learning rate, so I reverted the model to lr 0.001 and batch size 32.
+
+The code files, in the project, are hpo.py, which is used for training models in the hyperparameter tuner, inference2.py, which is for the entrypoint for the model when deploying to an endpoint, and train_model.py, which is used for training the best hyperparameter model but also collecting debug and profiling data.
 
 ## Debugging and Profiling
 **TODO**: Give an overview of how you performed model debugging and profiling in Sagemaker
@@ -42,11 +47,41 @@ I found that loss was increasing: the learning rate was too large.
 ## Model Deployment
 **TODO**: Give an overview of the deployed model and instructions on how to query the endpoint with a sample input.
 
-The deployed endpoint is accepting bytes for an image, but the butes should be saved from and image. This is implemented in train_and_deploy.ipynb with the Image and io.BytesIO modules.
+The deployed endpoint is accepting bytes for an image, but the butes should be saved from and image. This is implemented in train_and_deploy.ipynb with the Image and io.BytesIO modules. Here is a code sample:
+
+```
+import gzip 
+import numpy as np
+import random
+import os
+from PIL import Image
+import io
+
+file = 'data/cifar-10-batches-py/data_batch_1'
+def unpickle(file):
+    import pickle
+    with open(file, 'rb') as fo:
+        data = pickle.load(fo, encoding='bytes')
+    return data
+
+data=unpickle(file)
+data=np.reshape(data[b'data'][0], (32, 32, 3), order='F')
+im = Image.fromarray(data,mode='RGB')
+
+byteImgIO = io.BytesIO()
+im.save(byteImgIO, "PNG")
+byteImgIO.seek(0)
+byteImg = byteImgIO.read()
+
+response=predictor.predict(byteImg, initial_args={"ContentType": "image/jpeg"})
+# Image.open(io.BytesIO(byteImg))
+response
+```
 
 **TODO** Remember to provide a screenshot of the deployed active endpoint in Sagemaker.
 
-File name is endpoint.png.
+![File name is endpoint.png](./endpoint.png)
+
 
 ## Standout Suggestions
 **TODO (Optional):** This is where you can provide information about any standout suggestions that you have attempted.
