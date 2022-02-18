@@ -13,13 +13,10 @@ import argparse
 
 from smdebug import modes
 from smdebug.profiler.utils import str2bool
-from smdebug.pytorch import get_hook
 import json
 import os
 import time
 import smdebug.pytorch as smd
-
-#TODO: Import dependencies for Debugging andd Profiling
 
 def test(model, test_loader, criterion, device):
     '''
@@ -28,21 +25,22 @@ def test(model, test_loader, criterion, device):
           Remember to include any debugging/profiling hooks that you might need
     '''
     model.eval()
-    running_loss=0
-    running_corrects=0
+    with torch.no_grad():
+        running_loss=0
+        running_corrects=0
 
-    for inputs, labels in test_loader:
-        inputs=inputs.to(device)
-        labels=labels.to(device)
-        outputs=model(inputs)
-        loss=criterion(outputs, labels)
-        _, preds = torch.max(outputs, 1)
-        running_loss += loss.item() * inputs.size(0)
-        running_corrects += torch.sum(preds == labels.data).item()
+        for inputs, labels in test_loader:
+            inputs=inputs.to(device)
+            labels=labels.to(device)
+            outputs=model(inputs)
+            loss=criterion(outputs, labels)
+            _, preds = torch.max(outputs, 1)
+            running_loss += loss.item() * inputs.size(0)
+            running_corrects += torch.sum(preds == labels.data).item()
 
-    total_loss = running_loss / len(test_loader.dataset)
-    total_acc = running_corrects/ len(test_loader.dataset)
-    print(f"Testing Accuracy: {100*total_acc}, Testing Loss: {total_loss}")
+        total_loss = running_loss / len(test_loader.dataset)
+        total_acc = running_corrects/ len(test_loader.dataset)
+        print(f"Testing Accuracy: {100*total_acc}, Testing Loss: {total_loss}")
     pass
 
 def train(model, train_loader, valid_loader, loss_optim, optimizer, epochs, device):
@@ -76,17 +74,18 @@ def train(model, train_loader, valid_loader, loss_optim, optimizer, epochs, devi
         print("START VALIDATING")
         #TODO: Set hook to eval mode
         model.eval()
-        val_loss = 0
         with torch.no_grad():
-            for _, (inputs, targets) in enumerate(valid_loader):
-                inputs, targets = inputs.to(device), targets.to(device)
-                outputs = model(inputs)
-                loss = loss_optim(outputs, targets)
-                val_loss += loss.item()
-        print(
-            "Epoch %d: train loss %.3f, val loss %.3f"
-            % (i, train_loss, val_loss)
-        )
+            val_loss = 0
+            with torch.no_grad():
+                for _, (inputs, targets) in enumerate(valid_loader):
+                    inputs, targets = inputs.to(device), targets.to(device)
+                    outputs = model(inputs)
+                    loss = loss_optim(outputs, targets)
+                    val_loss += loss.item()
+            print(
+                "Epoch %d: train loss %.3f, val loss %.3f"
+                % (i, train_loss, val_loss)
+            )
     return model
 
 def net():
