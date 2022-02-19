@@ -31,8 +31,8 @@ def test(model, test_loader, criterion, device):
     with torch.no_grad():
         running_loss=0
         running_corrects=0
-    #     hook.register_loss(criterion)
-    #     hook.set_mode(modes.EVAL)
+#         hook.register_loss(criterion)
+#         hook.set_mode(modes.EVAL)
 
         for inputs, labels in test_loader:
             inputs=inputs.to(device)
@@ -49,7 +49,7 @@ def test(model, test_loader, criterion, device):
         print(f"Testing Loss: {total_loss}")
     pass
 
-def train(model, train_loader, valid_loader, loss_optim, optimizer, epochs, device):
+def train(model, train_loader, valid_loader, loss_optim, optimizer, epochs, device, hook):
     '''
     TODO: Complete this function that can take a model and
           data loaders for training and will get train the model
@@ -57,16 +57,13 @@ def train(model, train_loader, valid_loader, loss_optim, optimizer, epochs, devi
     '''
     model.train()
     #TODO: Set Hook to track the loss
-    hook = get_hook(create_if_not_exists=True)
-    if hook:
-        hook.register_loss(loss_optim)    
+#     hook.register_loss(loss_optim)    
     
     for i in range(epochs):
         print("START TRAINING")
         # TODO: Set hook to train mode
-        if hook:
-            hook.set_mode(modes.TRAIN)
         model.train()
+        hook.set_mode(modes.TRAIN)
         train_loss = 0
         running_samples = 0
         for image_no, (inputs, targets) in enumerate(train_loader):
@@ -86,9 +83,8 @@ def train(model, train_loader, valid_loader, loss_optim, optimizer, epochs, devi
 
         print("START VALIDATING")
         #TODO: Set hook to eval mode
-        if hook:
-            hook.set_mode(modes.EVAL)
         model.eval()
+        hook.set_mode(modes.EVAL)
         with torch.no_grad():
             val_loss = 0
             with torch.no_grad():
@@ -156,9 +152,8 @@ def main(args):
     model=net()
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model=model.to(device)
-#     hook = get_hook(create_if_not_exists=True)
-#     if hook:
-#         hook.register_hook(model)
+    hook = get_hook(create_if_not_exists=True)
+    hook.register_hook(model)
     
     '''
     TODO: Create your loss and optimizer
@@ -171,7 +166,7 @@ def main(args):
     Remember that you will need to set up a way to get training data from S3
     '''
     (train_loader, test_loader) = create_data_loaders(args.data_dir, args.batch_size, args.test_batch_size)
-    model=train(model, train_loader, test_loader, loss_criterion, optimizer, args.epochs, device)
+    model=train(model, train_loader, test_loader, loss_criterion, optimizer, args.epochs, device, hook)
     
     '''
     TODO: Test the model to see its accuracy
